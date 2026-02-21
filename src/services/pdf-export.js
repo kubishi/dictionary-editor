@@ -114,6 +114,47 @@ function buildDocDefinition(entries, options = {}) {
     })
   }
 
+  // --- Reverse lookup (English → Paiute) ---
+  const reverseBlocks = buildReverseLookup(sorted, { fontSize, HANGING_INDENT })
+  if (reverseBlocks.length > 0) {
+    content.push({ text: '', pageBreak: 'after' })
+
+    // Reverse section title page
+    content.push(
+      { text: 'English – Paiute Index', fontSize: fontSize + 12, bold: true, alignment: 'center', margin: [0, 140, 0, 16] },
+      {
+        canvas: [{ type: 'line', x1: 180, y1: 0, x2: 360, y2: 0, lineWidth: 0.5, lineColor: '#999' }],
+        margin: [0, 0, 0, 0]
+      },
+      { text: '', pageBreak: 'after' }
+    )
+
+    // Letter sections for reverse lookup
+    let isFirstReverseLetter = true
+    for (const { letter, blocks } of reverseBlocks) {
+      if (!isFirstReverseLetter) {
+        content.push({ text: '', pageBreak: 'after' })
+      }
+      isFirstReverseLetter = false
+
+      content.push({
+        text: `${letter} ${letter.toLowerCase()}`,
+        fontSize: fontSize + 10,
+        alignment: 'center',
+        margin: [0, 10, 0, 12]
+      })
+
+      const { left, right } = splitIntoColumns(blocks, fontSize)
+      content.push({
+        columns: [
+          { width: '*', stack: left },
+          { width: '*', stack: right }
+        ],
+        columnGap: COL_GAP
+      })
+    }
+  }
+
   return {
     pageSize,
     pageMargins: PAGE_MARGINS,
@@ -307,6 +348,129 @@ function buildEntryBlock(entry, { includeExamples, fontSize, HANGING_INDENT }) {
     leadingIndent: -HANGING_INDENT,
     fontSize
   }
+}
+
+/**
+ * Build the reverse lookup index (English → Paiute).
+ * Groups senses by English gloss, sorted alphabetically.
+ *
+ * Format: keyword  headword headword POS gloss; headword2 ...
+ */
+function buildReverseLookup(sortedEntries, { fontSize, HANGING_INDENT }) {
+  // Collect all English glosses → Paiute entries
+  const index = new Map() // lowercase key → { display, items[] }
+
+  for (const entry of sortedEntries) {
+    const word = entry.word || ''
+    const morphType = entry.traits?.find(t => t.name === 'morph-type')?.value || ''
+    const morphAbbr = MORPH_ABBREV[morphType] || ''
+    const senses = entry.senses || []
+    const hasRelations = entry.relations?.length > 0
+
+    // Variant-only entries: include with variant info
+    if (senses.length === 0 && hasRelations) {
+      const rel = entry.relations[0]
+      const variantType = rel.traits?.find(t => t.name === 'variant-type')?.value || ''
+      const refWord = (rel.ref || '').split('_')[0]
+      const typeAbbr = variantType === 'Free Variant' ? 'fr. var.' :
+                       variantType === 'Dialectal Variant' ? 'dial. var.' :
+                       variantType === 'Spelling Variant' ? 'sp. var.' :
+                       variantType ? variantType.toLowerCase() : 'var.'
+      // Skip — variants will show up through their main entry's glosses
+      continue
+    }
+
+    for (const sense of senses) {
+      const pos = sense.grammaticalInfo?.value || ''
+      const posAbbr = POS_ABBREV[pos] || pos.toLowerCase()
+      const posStr = [posAbbr, morphAbbr].filter(Boolean).join(' ')
+
+      const gloss = (sense.glosses?.en || '').trim()
+      const def = (sense.definitions?.en || '').trim()
+
+      // Use gloss as the keyword; fall back to first sentence of definition
+      let keyword = gloss
+      if (!keyword && def) {
+        keyword = def.split(/[.;]/)[0].trim()
+        if (keyword.length > 50) keyword = keyword.slice(0, 50).trim()
+      }
+      if (!keyword) continue
+
+      // Handle glosses with multiple meanings separated by commas/semicolons
+      // e.g. "stretch out, extend" → two entries: "stretch out" and "extend"
+      const keywords = keyword.includes(';') ? keyword.split(';') :
+                       keyword.includes(',') ? keyword.split(',') : [keyword]
+
+      for (let kw of keywords) {
+        kw = kw.trim()
+        if (!kw) continue
+        const kwLower = kw.toLowerCase()
+
+        if (!index.has(kwLower)) {
+          index.set(kwLower, { display: kw, items: [] })
+        }
+        index.get(kwLower).items.push({ word, posStr, gloss: kw })
+      }
+    }
+  }
+
+  // Sort keywords alphabetically
+  const sortedKeys = [...index.keys()].sort((a, b) => a.localeCompare(b))
+
+  // Group by first letter
+  const letterGroupsArr = []
+  let currentLetter = null
+  let currentBlocks = []
+
+  for (const key of sortedKeys) {
+    const { display, items } = index.get(key)
+    const letter = getFirstAlpha(display).toUpperCase() || '#'
+
+    if (letter !== currentLetter) {
+      if (currentLetter !== null) {
+        letterGroupsArr.push({ letter: currentLetter, blocks: currentBlocks })
+      }
+      currentLetter = letter
+      currentBlocks = []
+    }
+
+    // Build the reverse entry block
+    const textParts = []
+    textParts.push({ text: display, bold: true })
+
+    // Deduplicate items by word (same word might appear from multiple senses with same gloss)
+    const seen = new Set()
+    const uniqueItems = items.filter(item => {
+      if (seen.has(item.word)) return false
+      seen.add(item.word)
+      return true
+    })
+
+    for (let i = 0; i < uniqueItems.length; i++) {
+      const item = uniqueItems[i]
+      if (i > 0) textParts.push({ text: '; ' })
+      textParts.push({ text: `  ${item.word}`, bold: true, italics: true })
+      textParts.push({ text: ` ${item.word}` })
+      if (item.posStr) {
+        textParts.push({ text: ` ${item.posStr}`, italics: true })
+      }
+      textParts.push({ text: ` ${item.gloss}` })
+    }
+
+    currentBlocks.push({
+      text: textParts,
+      margin: [HANGING_INDENT, 1.5, 0, 1.5],
+      leadingIndent: -HANGING_INDENT,
+      fontSize
+    })
+  }
+
+  // Push last letter group
+  if (currentLetter !== null) {
+    letterGroupsArr.push({ letter: currentLetter, blocks: currentBlocks })
+  }
+
+  return letterGroupsArr
 }
 
 /**
