@@ -27,6 +27,10 @@ onMounted(async () => {
   }
 })
 
+function selectEntryFromPdf(guid) {
+  dictionary.selectedGuid = guid
+}
+
 function startResize(e) {
   e.preventDefault()
   isResizing.value = true
@@ -94,7 +98,7 @@ function startResize(e) {
       class="shrink-0 flex flex-col overflow-hidden"
       :style="{ width: previewWidth + 'px' }"
     >
-      <PdfPreview @close="showPdfPreview = false" />
+      <PdfPreview @close="showPdfPreview = false" @select-entry="selectEntryFromPdf" />
     </div>
 
     <!-- Resize overlay to prevent iframe from stealing mouse events -->

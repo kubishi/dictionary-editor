@@ -193,6 +193,11 @@ function buildEntryBlock(entry, { includeExamples, fontSize, HANGING_INDENT }) {
   // Build inline text array for the entire entry
   const textParts = []
 
+  // Invisible GUID marker for pdf.js click-to-navigate
+  if (entry.guid) {
+    textParts.push({ text: `\u00A7${entry.guid}\u00A7`, fontSize: 0.5, color: '#FFFFFF' })
+  }
+
   // Headword (bold)
   textParts.push({ text: entry.word || '(empty)', bold: true })
 
