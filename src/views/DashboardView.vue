@@ -54,6 +54,9 @@ async function importFile(file) {
     const text = await file.text()
     const count = await dictionary.importLift(text)
     ui.success(`Imported ${count} entries from ${file.name}`)
+    if (!localStorage.getItem('kubishi_tour_seen')) {
+      localStorage.setItem('kubishi_tour_pending', 'true')
+    }
     router.push('/browse')
   } catch (err) {
     console.error('Import error:', err)

@@ -75,6 +75,7 @@ const navItems = computed(() => [
       </router-link>
 
       <button
+        id="tour-save-btn"
         v-if="dictionary.isLoaded"
         @click="exportLift"
         :disabled="isExporting"

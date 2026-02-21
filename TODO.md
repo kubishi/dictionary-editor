@@ -4,6 +4,6 @@
 - [x] Make dark mode the default.
 - [x] For the sake of searching in the browse, can you treat ü and u as the same. Also ŵ as w, ŷ as y?
 
-- [ ] Can we add a tour the first time the user uploads a .lift file? Just a simple one that points out the different sections and especially highlights that they need to export their .lift file. Their changes are saved in the browser, but that shouldn't be relied on (e.g., if they clear their browser history, they will lose their work).
+- [x] Can we add a tour the first time the user uploads a .lift file? Just a simple one that points out the different sections and especially highlights that they need to export their .lift file. Their changes are saved in the browser, but that shouldn't be relied on (e.g., if they clear their browser history, they will lose their work).
 
 - [x] For the PDF, add the reverse lookup section at the end. ![alt text](image.png)
