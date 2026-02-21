@@ -3,26 +3,38 @@
  * Searches across word forms, glosses, and definitions.
  */
 
+/**
+ * Normalize text for search comparison.
+ * Treats accented Paiute characters as their ASCII equivalents:
+ *   ü/Ü → u, ŵ/Ŵ → w, ŷ/Ŷ → y
+ */
+const CHAR_MAP = { 'ü': 'u', 'Ü': 'u', 'ŵ': 'w', 'Ŵ': 'w', 'ŷ': 'y', 'Ŷ': 'y' }
+const CHAR_RE = /[üÜŵŴŷŶ]/g
+
+function normalize(text) {
+  return text.toLowerCase().replace(CHAR_RE, ch => CHAR_MAP[ch])
+}
+
 export function searchEntries(entries, query) {
   if (!query || !query.trim()) return entries
 
-  const terms = query.toLowerCase().trim().split(/\s+/)
+  const queryNorm = normalize(query.trim())
+  const terms = queryNorm.split(/\s+/)
 
   const scored = entries.map(entry => {
     let score = 0
-    const wordLower = (entry.word || '').toLowerCase()
-    const queryLower = query.toLowerCase().trim()
+    const wordNorm = normalize(entry.word || '')
 
     // Exact word match — highest boost
-    if (wordLower === queryLower) {
+    if (wordNorm === queryNorm) {
       score += 100
     }
     // Word starts with query
-    else if (wordLower.startsWith(queryLower)) {
+    else if (wordNorm.startsWith(queryNorm)) {
       score += 50
     }
     // Word contains query
-    else if (wordLower.includes(queryLower)) {
+    else if (wordNorm.includes(queryNorm)) {
       score += 25
     }
 
@@ -30,27 +42,27 @@ export function searchEntries(entries, query) {
     for (const term of terms) {
       // Forms
       for (const formText of Object.values(entry.forms || {})) {
-        if (formText.toLowerCase().includes(term)) score += 10
+        if (normalize(formText).includes(term)) score += 10
       }
 
       // Senses
       for (const sense of entry.senses || []) {
         for (const def of Object.values(sense.definitions || {})) {
-          if (def.toLowerCase().includes(term)) score += 8
+          if (normalize(def).includes(term)) score += 8
         }
         for (const gloss of Object.values(sense.glosses || {})) {
-          if (gloss.toLowerCase().includes(term)) score += 8
+          if (normalize(gloss).includes(term)) score += 8
           // Exact gloss match
-          if (gloss.toLowerCase() === term) score += 20
+          if (normalize(gloss) === term) score += 20
         }
         // Examples
         for (const ex of sense.examples || []) {
           for (const text of Object.values(ex.forms || {})) {
-            if (text.toLowerCase().includes(term)) score += 3
+            if (normalize(text).includes(term)) score += 3
           }
           for (const trans of ex.translations || []) {
             for (const text of Object.values(trans.forms || {})) {
-              if (text.toLowerCase().includes(term)) score += 3
+              if (normalize(text).includes(term)) score += 3
             }
           }
         }

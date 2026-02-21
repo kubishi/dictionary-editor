@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useDictionaryStore } from '../../stores/dictionary'
 import { useUiStore } from '../../stores/ui'
-import { RefreshCw, X, Loader2, Download, ZoomIn, ZoomOut } from 'lucide-vue-next'
+import { RefreshCw, X, Loader2, Download, ZoomIn, ZoomOut, Settings } from 'lucide-vue-next'
 import * as pdfjsLib from 'pdfjs-dist'
 import { TextLayer } from 'pdfjs-dist'
 
@@ -29,13 +29,14 @@ let pdfBlobUrl = null
 let observer = null
 const renderedPages = new Set()
 
-const pdfOptions = {
+const showSettings = ref(false)
+const pdfOptions = ref({
   title: 'Owens Valley Paiute Dictionary',
   subtitle: '',
   includeExamples: true,
   pageSize: 'LETTER',
   fontSize: 9
-}
+})
 
 function cleanup() {
   if (observer) { observer.disconnect(); observer = null }
@@ -55,7 +56,7 @@ async function regenerate() {
   try {
     const { generatePdfBlobUrl } = await import('../../services/pdf-export.js')
     const entries = dictionary.entriesArray
-    const url = await generatePdfBlobUrl(entries, pdfOptions)
+    const url = await generatePdfBlobUrl(entries, pdfOptions.value)
 
     cleanup()
     pdfBlobUrl = url
@@ -237,7 +238,7 @@ function findNearestGuid(clickedSpan) {
 async function downloadPdf() {
   try {
     const { generateDictionaryPdf } = await import('../../services/pdf-export.js')
-    await generateDictionaryPdf(dictionary.entriesArray, pdfOptions)
+    await generateDictionaryPdf(dictionary.entriesArray, pdfOptions.value)
     ui.success('PDF downloaded')
   } catch (err) {
     ui.error('Download failed: ' + err.message)
@@ -257,6 +258,41 @@ onBeforeUnmount(() => { cleanup() })
         <RefreshCw v-else class="w-3.5 h-3.5" />
         {{ isGenerating ? 'Generating...' : 'Regenerate' }}
       </button>
+
+      <div class="relative">
+        <button @click="showSettings = !showSettings" class="btn-ghost btn-sm" title="PDF settings">
+          <Settings class="w-3.5 h-3.5" />
+        </button>
+
+        <!-- Settings dropdown -->
+        <div v-if="showSettings" class="absolute left-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 z-30 space-y-2.5">
+          <div>
+            <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Title</label>
+            <input v-model="pdfOptions.title" class="input input-sm mt-0.5" />
+          </div>
+          <div>
+            <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Subtitle</label>
+            <input v-model="pdfOptions.subtitle" class="input input-sm mt-0.5" placeholder="Optional" />
+          </div>
+          <div class="flex gap-2">
+            <div class="flex-1">
+              <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Page</label>
+              <select v-model="pdfOptions.pageSize" class="input input-sm mt-0.5">
+                <option value="LETTER">Letter</option>
+                <option value="A4">A4</option>
+              </select>
+            </div>
+            <div class="w-16">
+              <label class="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Font</label>
+              <input type="number" v-model.number="pdfOptions.fontSize" class="input input-sm mt-0.5" min="6" max="16" />
+            </div>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+            <input type="checkbox" v-model="pdfOptions.includeExamples" class="rounded border-gray-300 text-indigo-600" />
+            Include examples
+          </label>
+        </div>
+      </div>
 
       <button @click="downloadPdf" :disabled="!pdfDoc || isGenerating" class="btn-secondary btn-sm">
         <Download class="w-3.5 h-3.5" />

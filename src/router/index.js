@@ -17,11 +17,6 @@ const router = createRouter({
       path: '/mass-edit',
       name: 'mass-edit',
       component: () => import('../views/MassEditView.vue')
-    },
-    {
-      path: '/export',
-      name: 'export',
-      component: () => import('../views/ExportView.vue')
     }
   ]
 })

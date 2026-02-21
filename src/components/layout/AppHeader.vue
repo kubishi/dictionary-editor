@@ -1,15 +1,19 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDictionaryStore } from '../../stores/dictionary'
-import { BookOpen, List, Wand2, Download, Sun, Moon } from 'lucide-vue-next'
+import { useUiStore } from '../../stores/ui'
+import { BookOpen, List, Wand2, Download, Sun, Moon, Loader2 } from 'lucide-vue-next'
 import { useLocalStorage } from '@vueuse/core'
+import { saveAs } from 'file-saver'
 
 const route = useRoute()
 const router = useRouter()
 const dictionary = useDictionaryStore()
+const ui = useUiStore()
 
-const darkMode = useLocalStorage('darkMode', false)
+const darkMode = useLocalStorage('darkMode', true)
+const isExporting = ref(false)
 
 function toggleDark() {
   darkMode.value = !darkMode.value
@@ -21,11 +25,25 @@ if (darkMode.value) {
   document.documentElement.classList.add('dark')
 }
 
+async function exportLift() {
+  if (isExporting.value) return
+  isExporting.value = true
+  try {
+    const xml = await dictionary.exportToLift()
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
+    saveAs(blob, 'dictionary.lift')
+    ui.success('LIFT file downloaded')
+  } catch (err) {
+    ui.error('Export failed: ' + err.message)
+  } finally {
+    isExporting.value = false
+  }
+}
+
 const navItems = computed(() => [
   { path: '/', name: 'Dashboard', icon: BookOpen, show: true },
   { path: '/browse', name: 'Browse & Edit', icon: List, show: dictionary.isLoaded },
-  { path: '/mass-edit', name: 'Mass Edit', icon: Wand2, show: dictionary.isLoaded },
-  { path: '/export', name: 'Export', icon: Download, show: dictionary.isLoaded }
+  { path: '/mass-edit', name: 'Mass Edit', icon: Wand2, show: dictionary.isLoaded }
 ])
 </script>
 
@@ -55,6 +73,17 @@ const navItems = computed(() => [
         <component :is="item.icon" class="w-4 h-4" />
         {{ item.name }}
       </router-link>
+
+      <button
+        v-if="dictionary.isLoaded"
+        @click="exportLift"
+        :disabled="isExporting"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+      >
+        <Loader2 v-if="isExporting" class="w-4 h-4 animate-spin" />
+        <Download v-else class="w-4 h-4" />
+        Save!
+      </button>
     </nav>
 
     <div class="ml-auto flex items-center gap-2">
